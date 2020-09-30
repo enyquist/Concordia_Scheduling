@@ -1,0 +1,854 @@
+
+R version 3.2.2 (2015-08-14) -- "Fire Safety"
+Copyright (C) 2015 The R Foundation for Statistical Computing
+Platform: x86_64-w64-mingw32/x64 (64-bit)
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> start = proc.time()
+> setwd("C:/Scheduler/R/R-3.2.2/bin/code")
+> # By Erik Nyquist and Kyle Stengel 2015
+> # Operations Research Term Project
+> # Student Ambassadors
+> # 
+> # This program was designed for the Concordia College Student Ambassador program.
+> # 
+> # It incorporates client data of student availability, work preference, and student attributes
+> # such as major and interests.
+> # 
+> # Taking in all of the data, the program distributes the students over the work week in such a way as to maximize the minimum
+> # number of attributes represented in a time bracket (ie - Monday Morning).
+> # 
+> # This way, a "snapshot" of Concordia is present at any given time and available to give tours to prospective students.
+> # 
+> # What follows is a TABLE OF CONTENTS:
+> # 
+> #   lines 039 - 050 ------------- Easywriter.R
+> #   lines 051 - 113 ------------- Pull attribute data from the client
+> #   lines 114 - 151 ------------- Pull availability data from the client
+> #   lines 152 - 188 ------------- Creation of the Shift Groups
+> #   lines 189 - 215 ------------- Objective function from people's preferences
+> #   lines 216 - 247 ------------- CONSTRAINT 1: Attributes must be at least 0
+> #   lines 248 - 279 ------------- CONSTRAINT 2: Attributes must be no more than 1
+> #   lines 280 - 305 ------------- CONSTRAINT 3: Each person must work at least 1 shift
+> #   lines 306 - 331 ------------- CONSTRAINT 4: Each person must work no more than 6 shifts
+> #   lines 332 - 369 ------------- CONSTRAINT 5: Attributes over Shift Groups must be at least 0
+> #   lines 370 - 407 ------------- CONSTRAINT 6: Attributes over Shift Groups must be no more than 1
+> #   lines 408 - 439 ------------- CONSTRAINT 7: Z is at least the sum of all Attributes over all shifts
+> #   lines 440 - 469 ------------- CONSTRAINT 8: Filling High Demand Shifts
+> #   lines 470 - 496 ------------- CONSTRAINT 9: Placing High Demand Students in High Demand Shifts
+> #   lines 497 - 533 ------------- CONSTRAINT 10: Students cannot work shifts that coincide
+> #   lines 534 - 559 ------------- CONSTRAINT 11: Students get no more than the number of shifts designated
+> #   lines 560 - 589 ------------- CONSTRAINT 12: Filling the Lunch Time Slots
+> #   lines 590 - 598 ------------- Build the master Constriant Matrix
+> #   lines 599 - 624 ------------- Create the LP
+> #   lines 625 - END ------------- Interpret the Results
+> 
+> 
+> ##############
+> # EasyWriter.R
+> ##############
+> 
+> easyWriter = function(vectorToAddCoefficientsTo,fullVariableNameList,regularExpressionToSearchFor,coefficientToGoWithNamesYouWant){
++   #regular expressions provide an incredibly robust way of searching through text files.  Seriously, google them.
++   indicesToModify = grep(regularExpressionToSearchFor,fullVariableNameList, perl=TRUE, value=FALSE) #grep is the function that executes the search for things that match the regular expression.
++   vectorToAddCoefficientsTo[indicesToModify] = coefficientToGoWithNamesYouWant #over-writes the locations that match the regular expression.
++   return(vectorToAddCoefficientsTo)
++ }
+> 
+> 
+> ###################################
+> #Pull attribute data from the User
+> ###################################
+> 
+> rawData = read.csv("Attributes.csv",header=TRUE,stringsAsFactors=FALSE,row.names = 1)
+> Attributes = rawData
+> 
+> HighDemand = Attributes[,ncol(Attributes)]# Grab the last column of Attributes
+> HighDemand = rownames(Attributes)[HighDemand != ""]# Eliminate any empty strings
+> 
+> Attributes = Attributes[,-ncol(Attributes)]# Remove the last column of Attributes
+> 
+> Undecided = Attributes[,ncol(Attributes)]# Grab the last column of Attributes
+> Undecided = rownames(Attributes)[Undecided != ""]# Eliminate any empty strings
+> 
+> Attributes = Attributes[,-ncol(Attributes)]# Remove the last column of Attributes
+> 
+> Education = Attributes[,ncol(Attributes)]# Grab the last column of Attributes
+> Education = rownames(Attributes)[Education != ""]# Eliminate any empty strings
+> 
+> Attributes = Attributes[,-ncol(Attributes)]# Remove the last column of Attributes
+> 
+> EnglishORComm = Attributes[,ncol(Attributes)]# Grab the last column of Attributes
+> EnglishORComm = rownames(Attributes)[EnglishORComm != ""]# Eliminate any empty strings
+> 
+> Attributes = Attributes[,-ncol(Attributes)]# Remove the last column of Attributes
+> 
+> Sports = Attributes[,ncol(Attributes)]# Grab the last column of Attributes
+> Sports = rownames(Attributes)[Sports != ""]# Eliminate any empty strings
+> 
+> Attributes = Attributes[,-ncol(Attributes)]# Remove the last column of Attributes
+> 
+> Health = Attributes[,ncol(Attributes)]# Grab the last column of Attributes
+> Health = rownames(Attributes)[Health != ""]# Eliminate any empty strings
+> 
+> Attributes = Attributes[,-ncol(Attributes)]
+> 
+> Humanities = Attributes[,ncol(Attributes)]# Grab the last column of Attributes
+> Humanities = rownames(Attributes)[Humanities != ""]# Eliminate any empty strings
+> 
+> Attributes = Attributes[,-ncol(Attributes)]# Remove the last column of Attributes
+> 
+> Music = Attributes[,ncol(Attributes)]# Grab the new last column of Attributes
+> Music = rownames(Attributes)[Music != ""]# Eliminate any empty strings
+> 
+> Attributes = Attributes[,-ncol(Attributes)]# Remove the last column of Attributes
+> 
+> Art = Attributes[,ncol(Attributes)]# Grab the new last column of Attributes
+> Art = rownames(Attributes)[Art != ""]# Eliminate any empty strings
+> 
+> Attributes = Attributes[,-ncol(Attributes)]# Remove the last column of Attributes
+> 
+> Science = Attributes[,ncol(Attributes)]# Grab the new last column of Attributes
+> Science = rownames(Attributes)[Science != ""]# Eliminate any empty strings
+> 
+> Attributes = Attributes[,-ncol(Attributes)]# Remove the last column of Attributes
+> 
+> Business = Attributes[,ncol(Attributes)]# Grab the new last column of Attributes
+> Business = rownames(Attributes)[Business != ""]# Eliminate any empty strings
+> 
+> attributeSets = list(Business, Science, Art, Music, Humanities, Health,Sports, EnglishORComm, Education, Undecided, HighDemand)# Create the AttributeSet
+> 
+> 
+> #####################################################
+> # Pull availability and preference data from the User
+> #####################################################
+> 
+> rawData = read.csv("Availability.csv",header=TRUE,row.names=1,stringsAsFactors=FALSE)# header=TRUE grabs column labels, row.names=1 uses the first column for (surprise!) row names, and stringAsFactors=FALSE prevents R from thinking a 1 or 13 is a string that says "1" or "13" instead of the actual numbers 1 and 13.  Oh, the shenanigans...
+> availabilityAndPreferenceMatrix = rawData[,-ncol(rawData)]#removes last column
+> numberOfShiftsWanted = rawData[,ncol(rawData)]#grabs last column
+> names(numberOfShiftsWanted) = rownames(availabilityAndPreferenceMatrix) #lists don't have rownames or colnames... theyjust have names.
+> 
+> listOfPriorityLevels = c("1","2","3","4","5")
+> symbolsForForbiddenTimeSlot = c("x","X") #I put both capital and lower case x's, to help with typos on the data entry end.
+> mediumM = 0.5 #available but not ranked
+> bigM = -10000 #Students are not available at these times
+> 
+> listOfPersons = rownames(availabilityAndPreferenceMatrix)
+> listOfTimeSlots = colnames(availabilityAndPreferenceMatrix)[1:length(availabilityAndPreferenceMatrix)]
+> 
+> listOfTimeSlotsNew = list(Monday = c("Monday.1","Monday.2","Monday.3","Monday.4","Monday.5","Monday.6","Monday.7","Monday.8","Monday.9","Monday.10","Monday.11","Monday.12","Monday.13","Monday.14"),
++                           Tuesday = c("Tuesday.1","Tuesday.2","Tuesday.3","Tuesday.4","Tuesday.5","Tuesday.6","Tuesday.7","Tuesday.8","Tuesday.9","Tuesday.10","Tuesday.11","Tuesday.12","Tuesday.13","Tuesday.14"),
++                           Wednesday = c("Wednesday.1","Wednesday.2","Wednesday.3","Wednesday.4","Wednesday.5","Wednesday.6","Wednesday.7","Wednesday.8","Wednesday.9","Wednesday.10","Wednesday.11","Wednesday.12","Wednesday.13","Wednesday.14"),
++                           Thursday = c("Thursday.1","Thursday.2","Thursday.3","Thursday.4","Thursday.5","Thursday.6","Thursday.7","Thursday.8","Thursday.9","Thursday.10","Thursday.11","Thursday.12","Thursday.13","Thursday.14"),
++                           Friday = c("Friday.1","Friday.2","Friday.3","Friday.4","Friday.5","Friday.6","Friday.7","Friday.8","Friday.9","Friday.10","Friday.11","Friday.12","Friday.13","Friday.14"))
+> 
+> namesOfVariables = c() #initialize with an empty list
+> for(person in listOfPersons){ #just keep hitting enter after these open curly brackets...it'll advance to the next line and wait to execute until all brackets are closed off. 
++  for(time in listOfTimeSlots){      
++    namesOfVariables = c(namesOfVariables,paste0(as.character(person),".",as.character(time)))    
++  }
++ }
+> 
+> ExtraNamesOfVariables = c()
+> for(pp in 1:length(attributeSets)){
++  for(yy in listOfTimeSlots){
++    ExtraNamesOfVariables = c(ExtraNamesOfVariables,paste0("Attribute",as.character(pp),".",as.character(yy)))
++  }
++ }
+> 
+> 
+> ###########################################################################
+> # Generating the larger time slots (i.e. morning, LunchTime, afternoon)
+> ###########################################################################
+> 
+> listOfDays = c("Monday","Tuesday","Wednesday","Thursday","Friday")
+> listOfTimesOfDay = c("Morning","LunchTime","Afternoon")
+> 
+> listOfMorningSlots = list()
+> listOfMorningSlots = list(Monday = c("Monday.1","Monday.2","Monday.3","Monday.4","Monday.5"), Tuesday = c("Tuesday.1","Tuesday.2","Tuesday.3","Tuesday.4","Tuesday.5"), Wednesday = c("Wednesday.1","Wednesday.2","Wednesday.3","Wednesday.4","Wednesday.5"), Thursday = c("Thursday.1","Thursday.2","Thursday.3","Thursday.4","Thursday.5"), Friday = c("Friday.1","Friday.2","Friday.3","Friday.4","Friday.5"))
+> 
+> listOfLunchTimeSlots = list()
+> listOfLunchTimeSlots = list(Monday = c("Monday.6","Monday.7","Monday.8"), Tuesday = c("Tuesday.6","Tuesday.7","Tuesday.8"), Wednesday = c("Wednesday.6","Wednesday.7","Wednesday.8"), Thursday = c("Thursday.6","Thursday.7","Thursday.8"), Friday = c("Friday.6","Friday.7","Friday.8"))
+> 
+> listOfAfternoonSlots = list()
+> listOfAfternoonSlots = list(Monday = c("Monday.9","Monday.10","Monday.11","Monday.12","Monday.13","Monday.14"), Tuesday = c("Tuesday.9","Tuesday.10","Tuesday.11","Tuesday.12","Tuesday.13","Tuesday.14"), Wednesday = c("Wednesday.9","Wednesday.10","Wednesday.11","Wednesday.12","Wednesday.13","Wednesday.14"), Thursday = c("Thursday.9","Thursday.10","Thursday.11","Thursday.12","Thursday.13","Thursday.14"), Friday = c("Friday.9","Friday.10","Friday.11","Friday.12","Friday.13","Friday.14"))
+> 
+> listOfLargerTimeSlots = list(Mornings = listOfMorningSlots, LunchTimes = listOfLunchTimeSlots, Afternoons = listOfAfternoonSlots)
+> 
+> #Axvig: get a better name than listOfLargerTimeSlots1
+> listOfLargerTimeSlots1 = list(Mornings = list("MondayMorning","TuesdayMorning","WednesdayMorning","ThursdayMorning","FridayMorning"), LunchTimes = list("MondayLunchTime","TuesdayLunchTime","WednesdayLunchTime","ThursdayLunchTime","FridayLunchTime"), Afternoons = list("MondayAfternoon","TuesdayAfternoon","WednesdayAfternoon","ThursdayAfternoon","FridayAfternoon"))
+> 
+> 
+> MoreNamesOfVariables = c()
+> for(pp in 1:length(attributeSets)){
++   for(ff in listOfDays){
++     for(dd in listOfTimesOfDay){
++       MoreNamesOfVariables = c(MoreNamesOfVariables,paste0("Attribute",as.character(pp),".",as.character(ff),as.character(dd)))#Axvig: have you considered putting a dot between ff and dd?  You'd have to update all your regular expressions, so don't do it unless there's a good reason.
++     }
++   }
++ }
+> 
+> z = c("Z")
+> MoreNamesOfVariables1 = c(MoreNamesOfVariables,z)
+> 
+> namesOfVariables = c(namesOfVariables, ExtraNamesOfVariables, MoreNamesOfVariables1)
+> 
+> 
+> ##################################################################################
+> #Now let's get the objective function set up - we'll include people's preferences.
+> ##################################################################################
+> 
+> objectiveFunction = matrix(0,1,length(namesOfVariables)) 
+> colnames(objectiveFunction) = namesOfVariables           #initialization
+> 
+> for(person in listOfPersons){
++   for(time in listOfTimeSlots){
++     regularExpressionToSearchFor = paste0(as.character(person),".",as.character(time))
++     valueInTable = availabilityAndPreferenceMatrix[person,time]
++     if(is.element(valueInTable,listOfPriorityLevels)){#if they can work and have it ranked, assign the objective value that ranking
++       objectiveFunction = easyWriter(objectiveFunction,colnames(objectiveFunction),regularExpressionToSearchFor,5/as.numeric(valueInTable))#Axvig: what a stylish flip of the preference into something to maximize!  
++     }
++     if(!is.element(valueInTable,symbolsForForbiddenTimeSlot) & !is.element(valueInTable,listOfPriorityLevels)){#if they didn't mark that they can work, we could schedule them in that slot but it doesn't get them any "points"
++       objectiveFunction = easyWriter(objectiveFunction,colnames(objectiveFunction),regularExpressionToSearchFor,bigM)
++     }
++     if(is.element(valueInTable,symbolsForForbiddenTimeSlot)){#If they can work, but it's not one of their top preferences, we can schedule them there, but it doesn't get them as many "points"
++       objectiveFunction = easyWriter(objectiveFunction,colnames(objectiveFunction),regularExpressionToSearchFor,mediumM)
++     }
++   }
++ }
+> 
+> weightOfZRelativeToPreference = 100
+> objectiveFunction = easyWriter(objectiveFunction,colnames(objectiveFunction),"^Z$",weightOfZRelativeToPreference)
+> 
+> 
+> ##################################
+> #          FIRST CONSTRAINT
+> # attributes must be larger than 0
+> ##################################
+> 
+> FirstConstraintMatrix = matrix(0,0,length(namesOfVariables))
+> colnames(FirstConstraintMatrix) = namesOfVariables
+> FirstInequalities = matrix("",0,1)
+> FirstRightHandSide = matrix(0,0,1)
+> 
+> for (ll in 1:length(attributeSets)){
++   for(dd in listOfTimeSlots){
++     FirstNewConstraint = matrix(0,1,length(namesOfVariables)) #initialize
++     colnames(FirstNewConstraint) = namesOfVariables #name locations for easy finding of stuff
++     FirstNewInequality = matrix(">=",1,1)
++     FirstNewRightHandSide = matrix(0,1,1)
++     #now add the new stuff onto the ends of the overall vectors:
++     FirstInequalities = rbind(FirstInequalities,FirstNewInequality)
++     FirstRightHandSide = rbind(FirstRightHandSide, FirstNewRightHandSide)
++     for(bb in attributeSets[[ll]]){
++       FirstRegularExpressionToSearchFor = paste0(bb,"\\.",dd,"$") # if we don't include the x\\. at the beginning, we pick up all places where locationI is mentioned, whether first or second!  We just want first. 
++       FirstNewConstraint = easyWriter(FirstNewConstraint,namesOfVariables,FirstRegularExpressionToSearchFor,-0.001)
++       FirstRegularExpressionToSearchFor2 = paste0("Attribute",as.character(ll),"\\.",dd,"$")
++       FirstNewConstraint = easyWriter(FirstNewConstraint,namesOfVariables,FirstRegularExpressionToSearchFor2,1)
++     }
++     FirstConstraintMatrix = rbind(FirstConstraintMatrix,FirstNewConstraint) #rbind is the row-bind operation, concatenating matrix one on top of the other.  
++   }
++ }
+> 
+> CheckFirstConstraint = cbind(FirstConstraintMatrix,FirstInequalities,FirstRightHandSide)
+> 
+> 
+> #####################################
+> #           SECOND CONSTRAINT
+> # attributes must be no larger than 1
+> #####################################
+> 
+> SecondConstraintMatrix = matrix(0,0,length(namesOfVariables))
+> colnames(SecondConstraintMatrix) = namesOfVariables
+> SecondInequalities = matrix("",0,1)
+> SecondRightHandSide = matrix(0,0,1)
+> 
+> for (ll in 1:length(attributeSets)){
++   for(dd in listOfTimeSlots){
++     SecondNewConstraint = matrix(0,1,length(namesOfVariables)) #initialize
++     colnames(SecondNewConstraint) = namesOfVariables #name locations for easy finding of stuff
++     SecondNewInequality = matrix("<=",1,1)
++     SecondNewRightHandSide = matrix(0,1,1)
++     #now add the new stuff onto the ends of the overall vectors:
++     SecondInequalities = rbind(SecondInequalities,SecondNewInequality)
++     SecondRightHandSide = rbind(SecondRightHandSide, SecondNewRightHandSide)
++     for(bb in attributeSets[[ll]]){
++       SecondRegularExpressionToSearchFor = paste0(bb,"\\.",dd,"$") # if we don't include the x\\. at the beginning, we pick up all places where locationI is mentioned, whether first or second!  We just want first. 
++       SecondNewConstraint = easyWriter(SecondNewConstraint,namesOfVariables,SecondRegularExpressionToSearchFor,-1)
++       FirstRegularExpressionToSearchFor2 = paste0("Attribute",as.character(ll),"\\.",dd,"$")
++       SecondNewConstraint = easyWriter(SecondNewConstraint,namesOfVariables,FirstRegularExpressionToSearchFor2,1)
++     }
++     SecondConstraintMatrix = rbind(SecondConstraintMatrix,SecondNewConstraint) #rbind is the row-bind operation, concatenating matrix one on top of the other.  
++   }
++ }
+> 
+> CheckSecondConstraint = cbind(SecondConstraintMatrix,SecondInequalities,SecondRightHandSide)
+> 
+> 
+> ###########################################
+> #             THIRD CONSTRAINT
+> # Each person must work at least 1 shift
+> ###########################################
+> 
+> ThirdConstraintMatrix = matrix(0,0,length(namesOfVariables))
+> colnames(ThirdConstraintMatrix) = namesOfVariables
+> ThirdInequalities = matrix("",0,1)
+> ThirdRightHandSide = matrix(0,0,1)
+> 
+> for(tt in listOfPersons){
++   ThirdNewConstraint = matrix(0,1,length(namesOfVariables)) #initialize
++   colnames(ThirdNewConstraint) = namesOfVariables #name locations for easy finding of stuff
++   ThirdNewInequality = matrix(">=",1,1)
++   ThirdNewRightHandSide = matrix(1,1,1)
++   #now add the new stuff onto the ends of the overall vectors:
++   ThirdInequalities = rbind(ThirdInequalities,ThirdNewInequality)
++   ThirdRightHandSide = rbind(ThirdRightHandSide, ThirdNewRightHandSide)
++   ThirdRegularExpressionToSearchFor = paste0(as.character(tt),"\\.") # if we don't include the x\\. at the beginning, we pick up all places where locationI is mentioned, whether Third or second!  We just want Third. 
++   ThirdNewConstraint = easyWriter(ThirdNewConstraint,namesOfVariables,ThirdRegularExpressionToSearchFor,1)
++   ThirdConstraintMatrix = rbind(ThirdConstraintMatrix,ThirdNewConstraint) #rbind is the row-bind operation, concatenating matrix one on top of the other.  
++ }
+> 
+> CheckThirdConstraint = cbind(ThirdConstraintMatrix,ThirdInequalities,ThirdRightHandSide)
+> 
+> 
+> #############################################
+> #               FOURTH CONSTRAINT
+> # Each person must work no more than 6 shifts
+> #############################################
+> 
+> FourthConstraintMatrix = matrix(0,0,length(namesOfVariables))
+> colnames(FourthConstraintMatrix) = namesOfVariables
+> FourthInequalities = matrix("",0,1)
+> FourthRightHandSide = matrix(0,0,1)
+> 
+> for(tt in listOfPersons){
++   FourthNewConstraint = matrix(0,1,length(namesOfVariables)) #initialize
++   colnames(FourthNewConstraint) = namesOfVariables #name locations for easy finding of stuff
++   FourthNewInequality = matrix("<=",1,1)
++   FourthNewRightHandSide = matrix(6,1,1)
++   #now add the new stuff onto the ends of the overall vectors:
++   FourthInequalities = rbind(FourthInequalities,FourthNewInequality)
++   FourthRightHandSide = rbind(FourthRightHandSide, FourthNewRightHandSide)
++   FourthRegularExpressionToSearchFor = paste0(as.character(tt),"\\.") # if we don't include the x\\. at the beginning, we pick up all places where locationI is mentioned, whether Third or second!  We just want Third. 
++   FourthNewConstraint = easyWriter(FourthNewConstraint,namesOfVariables,FourthRegularExpressionToSearchFor,1)
++   FourthConstraintMatrix = rbind(FourthConstraintMatrix,FourthNewConstraint) #rbind is the row-bind operation, concatenating matrix one on top of the other.  
++ }
+> 
+> CheckFourthConstraint = cbind(FourthConstraintMatrix,FourthInequalities,FourthRightHandSide)
+> 
+> 
+> ######################################
+> #           FIFTH CONSTRAINT
+> # Attributes in Larger Time slots >= 0
+> ######################################
+> 
+> FifthConstraintMatrix = matrix(0,0,length(namesOfVariables))
+> colnames(FifthConstraintMatrix) = namesOfVariables
+> FifthInequalities = matrix("",0,1)
+> FifthRightHandSide = matrix(0,0,1)
+> 
+> for(rr in 1:length(attributeSets)){
++   for(uu in 1:length(listOfLargerTimeSlots)){
++     for(ww in 1:length(listOfLargerTimeSlots[[uu]])){
++       FifthNewConstraint = matrix(0,1,length(namesOfVariables)) #initialize
++       colnames(FifthNewConstraint) = namesOfVariables #name locations for easy finding of stuff
++       FifthNewInequality = matrix(">=",1,1)
++       FifthNewRightHandSide = matrix(0,1,1)
++       #now add the new stuff onto the ends of the overall vectors:
++       FifthInequalities = rbind(FifthInequalities,FifthNewInequality)
++       FifthRightHandSide = rbind(FifthRightHandSide, FifthNewRightHandSide)
++       for(kk in listOfLargerTimeSlots[[uu]][[ww]]){     #this will cycle over each day, each larger time slot (similar to our first/second constraints)
++         #Look at listOfLargerTimeSlots, listOfLargerTimeSlots[[1]], listOfLargerTimeSlots[[1]][[1]]
++         #to get a better idea of what listOfLargerTimeSlots is...(hint: it's a list of a list of lists...listception...)
++         FifthRegularExpressionToSearchFor1 = paste0("^Attribute",as.character(rr),"\\.",as.character(kk),"$")  
++         FifthNewConstraint = easyWriter(FifthNewConstraint,namesOfVariables,FifthRegularExpressionToSearchFor1,-0.001)
++       }
++       for(jj in listOfLargerTimeSlots1[[uu]][[ww]]){
++         regexToSearchFor = paste0("^Attribute",as.character(rr),"\\.",as.character(jj),"$")
++         FifthNewConstraint = easyWriter(FifthNewConstraint,namesOfVariables,regexToSearchFor,1)
++       }
++       FifthConstraintMatrix = rbind(FifthConstraintMatrix,FifthNewConstraint)
++     }
++   }
++ }
+> 
+> CheckFifthConstraint = cbind(FifthConstraintMatrix,FifthInequalities,FifthRightHandSide)
+> 
+> 
+> ########################################################
+> #                 SIXTH CONSTRAINT
+> # Attributes in larger time slots can be no bigger than 1
+> #########################################################
+> 
+> SixthConstraintMatrix = matrix(0,0,length(namesOfVariables))
+> colnames(SixthConstraintMatrix) = namesOfVariables
+> SixthInequalities = matrix("",0,1)
+> SixthRightHandSide = matrix(0,0,1)
+> 
+> for(rr in 1:length(attributeSets)){
++   for(uu in 1:length(listOfLargerTimeSlots)){
++     for(ww in 1:length(listOfLargerTimeSlots[[uu]])){
++       SixthNewConstraint = matrix(0,1,length(namesOfVariables)) #initialize
++       colnames(SixthNewConstraint) = namesOfVariables #name locations for easy finding of stuff
++       SixthNewInequality = matrix("<=",1,1)
++       SixthNewRightHandSide = matrix(0,1,1)
++       #now add the new stuff onto the ends of the overall vectors:
++       SixthInequalities = rbind(SixthInequalities,SixthNewInequality)
++       SixthRightHandSide = rbind(SixthRightHandSide, SixthNewRightHandSide)
++       for(kk in listOfLargerTimeSlots[[uu]][[ww]]){     #this will cycle over each day, each larger time slot (similar to our first/second constraints)
++         #Look at listOfLargerTimeSlots, listOfLargerTimeSlots[[1]], listOfLargerTimeSlots[[1]][[1]]
++         #to get a better idea of what listOfLargerTimeSlots is...(hint: it's a list of a list of lists...listception...)
++         SixthRegularExpressionToSearchFor1 = paste0("^Attribute",as.character(rr),"\\.",as.character(kk),"$")  
++         SixthNewConstraint = easyWriter(SixthNewConstraint,namesOfVariables,SixthRegularExpressionToSearchFor1,-1)
++       }
++       for(jj in listOfLargerTimeSlots1[[uu]][[ww]]){
++         regexToSearchFor = paste0("^Attribute",as.character(rr),"\\.",as.character(jj),"$")
++         SixthNewConstraint = easyWriter(SixthNewConstraint,namesOfVariables,regexToSearchFor,1)
++       }
++       SixthConstraintMatrix = rbind(SixthConstraintMatrix,SixthNewConstraint)
++     }
++   }
++ }
+> 
+> CheckSixthConstraint = cbind(SixthConstraintMatrix,SixthInequalities,SixthRightHandSide)
+> 
+> 
+> ###############################################
+> #                 SEVENTH CONSTRAINT
+> # Z <= sum(all attributes in larger time slots)
+> ###############################################
+> 
+> SeventhConstraintMatrix = matrix(0,0,length(namesOfVariables))
+> colnames(SeventhConstraintMatrix) = namesOfVariables
+> SeventhInequalities = matrix("",0,1)
+> SeventhRightHandSide = matrix(0,0,1)
+> 
+> for(uu in 1:length(listOfLargerTimeSlots1)){
++   for(ww in 1:length(listOfLargerTimeSlots1[[uu]])){
++     SeventhNewConstraint = matrix(0,1,length(namesOfVariables)) #initialize
++     colnames(SeventhNewConstraint) = namesOfVariables #name locations for easy finding of stuff
++     SeventhNewInequality = matrix("<=",1,1)
++     SeventhNewRightHandSide = matrix(0,1,1)
++     #now add the new stuff onto the ends of the overall vectors:
++     SeventhInequalities = rbind(SeventhInequalities,SeventhNewInequality)
++     SeventhRightHandSide = rbind(SeventhRightHandSide, SeventhNewRightHandSide)
++     for(jj in listOfLargerTimeSlots1[[uu]][[ww]]){ 
++       SeventhRegularExpressionToSearchFor1= paste0("^Attribute",".*\\",".",as.character(jj),"$")
++       SeventhNewConstraint = easyWriter(SeventhNewConstraint,namesOfVariables,SeventhRegularExpressionToSearchFor1,-1)
++       regexToSearchFor = "Z" #Axvig: you could put this line and the next ouside of the jj loop.  See why?
++       SeventhNewConstraint = easyWriter(SeventhNewConstraint,namesOfVariables,regexToSearchFor,1)
++     }
++       SeventhConstraintMatrix = rbind(SeventhConstraintMatrix,SeventhNewConstraint)
++   }
++ }
+> 
+> CheckSeventhConstraint = cbind(SeventhConstraintMatrix,SeventhInequalities,SeventhRightHandSide)
+> 
+> 
+> ###########################################################
+> #                 EIGHTH CONSTRAINT
+> # High importance time slots have at least 3 people working
+> ###########################################################
+> 
+> HighImportanceTimeSlots = c("Monday.1","Wednesday.1","Friday.1")#Axvig:  wouldn't Monday.2, Wednesday.2, and Friday.2, Monday.3, Wedensday.3, and Friday.3 also work?  They'd still be staffing higher on Monday/Friday mornings, and it might give you more flexibility in the model.  Just a thought...
+> 
+> EighthConstraintMatrix = matrix(0,0,length(namesOfVariables))
+> colnames(EighthConstraintMatrix) = namesOfVariables
+> EighthInequalities = matrix("",0,1)
+> EighthRightHandSide = matrix(0,0,1)
+> 
+> for(hh in HighImportanceTimeSlots){
++   EighthNewConstraint = matrix(0,1,length(namesOfVariables)) #initialize
++   colnames(EighthNewConstraint) = namesOfVariables #name locations for easy finding of stuff
++   EighthNewInequality = matrix(">=",1,1)
++   EighthNewRightHandSide = matrix(3,1,1)
++   #now add the new stuff onto the ends of the overall vectors:
++   EighthInequalities = rbind(EighthInequalities,EighthNewInequality)
++   EighthRightHandSide = rbind(EighthRightHandSide, EighthNewRightHandSide)
++   EighthRegularExpressionToSearchFor1= paste0(as.character(hh),"$")
++   EighthNewConstraint = easyWriter(EighthNewConstraint,namesOfVariables,EighthRegularExpressionToSearchFor1,1)
++   regexToSearchFor = paste0("^Attribute",".*","\\.",as.character(hh),"$")
++   EighthNewConstraint = easyWriter(EighthNewConstraint,namesOfVariables,regexToSearchFor,0)
++   EighthConstraintMatrix = rbind(EighthConstraintMatrix,EighthNewConstraint)
++ }
+> 
+> CheckEighthConstraint = cbind(EighthConstraintMatrix,EighthInequalities,EighthRightHandSide)
+> 
+> 
+> ##################################################################################
+> #                               NINTH CONSTRAINT
+> # We want at least one of our High Demand People in our High Importance Time Slots
+> ##################################################################################
+> 
+> NinthConstraintMatrix = matrix(0,0,length(namesOfVariables))
+> colnames(NinthConstraintMatrix) = namesOfVariables
+> NinthInequalities = matrix("",0,1)
+> NinthRightHandSide = matrix(0,0,1)
+> 
+> for(bb in HighImportanceTimeSlots){
++   NinthNewConstraint = matrix(0,1,length(namesOfVariables)) #initialize
++   colnames(NinthNewConstraint) = namesOfVariables #name locations for easy finding of stuff
++   NinthNewInequality = matrix(">=",1,1)
++   NinthNewRightHandSide = matrix(1,1,1)
++   #now add the new stuff onto the ends of the overall vectors:
++   NinthInequalities = rbind(NinthInequalities,NinthNewInequality)
++   NinthRightHandSide = rbind(NinthRightHandSide, NinthNewRightHandSide)
++   for(aa in HighDemand){
++     NinthRegularExpressionToSearchFor1 = paste0(as.character(aa),"\\.",as.character(bb),"$")
++     NinthNewConstraint = easyWriter(NinthNewConstraint,namesOfVariables,NinthRegularExpressionToSearchFor1,1)
++   }
++   NinthConstraintMatrix = rbind(NinthConstraintMatrix,NinthNewConstraint)
++ }
+> CheckNinthConstraint = cbind(NinthConstraintMatrix,NinthInequalities,NinthRightHandSide)
+> 
+> 
+> #############################################
+> #           TENTH CONSTRAINT
+> # People can't work in overlapping time slots
+> #############################################
+> 
+> TenthConstraintMatrix = matrix(0,0,length(namesOfVariables))
+> colnames(TenthConstraintMatrix) = namesOfVariables
+> TenthInequalities = matrix("",0,1)
+> TenthRightHandSide = matrix(0,0,1)
+> 
+> for(pp in listOfPersons){
++   for(aa in 1:length(listOfTimeSlotsNew)){
++     for(bb in 1:(length(listOfTimeSlotsNew[[aa]]) - 3)){#Axvig:  nice catch on the "minus 3" business.
++   TenthNewConstraint = matrix(0,1,length(namesOfVariables)) #initialize
++   colnames(TenthNewConstraint) = namesOfVariables #name locations for easy finding of stuff
++   TenthNewInequality = matrix("<=",1,1)
++   TenthNewRightHandSide = matrix(1,1,1)
++   #now add the new stuff onto the ends of the overall vectors:
++   TenthInequalities = rbind(TenthInequalities,TenthNewInequality)
++   TenthRightHandSide = rbind(TenthRightHandSide, TenthNewRightHandSide)
++   TenthRegularExpressionToSearchFor = paste0(as.character(pp),"\\.",as.character(listOfTimeSlotsNew[[aa]][[bb]]),"$")  
++   TenthNewConstraint = easyWriter(TenthNewConstraint,namesOfVariables,TenthRegularExpressionToSearchFor,1)
++   TenthRegularExpressionToSearchFor1 = paste0(as.character(pp),"\\.",as.character(listOfTimeSlotsNew[[aa]][[bb+1]]),"$")
++   TenthNewConstraint = easyWriter(TenthNewConstraint,namesOfVariables,TenthRegularExpressionToSearchFor1,1)
++   TenthRegularExpressionToSearchFor2 = paste0(as.character(pp),"\\.",as.character(listOfTimeSlotsNew[[aa]][[bb+2]]),"$")
++   TenthNewConstraint = easyWriter(TenthNewConstraint,namesOfVariables,TenthRegularExpressionToSearchFor2,1)
++   TenthRegularExpressionToSearchFor3 = paste0(as.character(pp),"\\.",as.character(listOfTimeSlotsNew[[aa]][[bb+3]]),"$")
++   TenthNewConstraint = easyWriter(TenthNewConstraint,namesOfVariables,TenthRegularExpressionToSearchFor3,1)
++   regexToSearchFor = paste0("^Attribute")
++   TenthNewConstraint = easyWriter(TenthNewConstraint,namesOfVariables,regexToSearchFor,0)
++   TenthConstraintMatrix = rbind(TenthConstraintMatrix,TenthNewConstraint)
++     }
++   }
++ }
+> CheckTenthConstraint = cbind(TenthConstraintMatrix,TenthInequalities,TenthRightHandSide)
+> 
+> 
+> ##########################################################
+> #                     ELEVENTH CONSTRAINT
+> # Give workers no more than the number of shifts requested
+> ##########################################################
+> 
+> EleventhConstraintMatrix = matrix(0,0,length(namesOfVariables))
+> colnames(EleventhConstraintMatrix) = namesOfVariables
+> EleventhInequalities = matrix("",0,1)
+> EleventhRightHandSide = matrix(0,0,1)
+> 
+> for(person in listOfPersons){
++   EleventhNewConstraint = matrix(0,1,length(namesOfVariables))
++   colnames(EleventhNewConstraint) = namesOfVariables
++   regularExpressionToSearchFor = paste0(as.character(person),"\\.") 
++   EleventhNewConstraint = easyWriter(EleventhNewConstraint,namesOfVariables,regularExpressionToSearchFor,1)
++   EleventhNewInequality = matrix("<=",1,1)
++   EleventhNewRightHandSide = matrix(numberOfShiftsWanted[[person]],1,1)#we use double hard brackets to gain access to just the information, not all the labels and such.
++   #now add the new stuff onto the ends of the overall vectors:
++   EleventhConstraintMatrix = rbind(EleventhConstraintMatrix, EleventhNewConstraint) #rbind is the row-bind operation, concatenating matrix one on top of the other.
++   EleventhInequalities = rbind(EleventhInequalities,EleventhNewInequality)
++   EleventhRightHandSide = rbind(EleventhRightHandSide, EleventhNewRightHandSide)     
++ }
+> 
+> CheckEleventhConstraint = cbind(EleventhConstraintMatrix,EleventhInequalities,EleventhRightHandSide)
+> 
+> 
+> #################################################################################
+> #                 TWELFTH CONSTRAINT
+> # Make sure at least 1 person is working over the lunch hour (noon-1pm) each day.
+> #################################################################################
+> 
+> TwelfthConstraintMatrix = matrix(0,0,length(namesOfVariables))
+> colnames(TwelfthConstraintMatrix) = namesOfVariables
+> TwelfthInequalities = matrix("",0,1)
+> TwelfthRightHandSide = matrix(0,0,1)
+> 
+> for(hh in 1:length(listOfLunchTimeSlots)){
++   TwelfthNewConstraint = matrix(0,1,length(namesOfVariables)) #initialize
++   colnames(TwelfthNewConstraint) = namesOfVariables #name locations for easy finding of stuff
++   TwelfthNewInequality = matrix(">=",1,1)
++   TwelfthNewRightHandSide = matrix(1,1,1)
++   #now add the new stuff onto the ends of the overall vectors:
++   TwelfthInequalities = rbind(TwelfthInequalities,TwelfthNewInequality)
++   TwelfthRightHandSide = rbind(TwelfthRightHandSide, TwelfthNewRightHandSide)
++   for(yy in listOfLunchTimeSlots[[hh]]){
++   TwelfthRegularExpressionToSearchFor1= paste0(as.character(yy),"$")
++   TwelfthNewConstraint = easyWriter(TwelfthNewConstraint,namesOfVariables,TwelfthRegularExpressionToSearchFor1,1)
++   regexToSearchFor = paste0("^Attribute",".*","\\.",as.character(yy),"$")
++   TwelfthNewConstraint = easyWriter(TwelfthNewConstraint,namesOfVariables,regexToSearchFor,0)
++   }
++   TwelfthConstraintMatrix = rbind(TwelfthConstraintMatrix,TwelfthNewConstraint)
++ }
+> 
+> CheckTwelfthConstraint = cbind(TwelfthConstraintMatrix,TwelfthInequalities,TwelfthRightHandSide)
+> 
+> 
+> ####################################################
+> # Now it's time to build our big constraint matrix!!
+> ####################################################
+> 
+> ConstraintMatrix = rbind(FirstConstraintMatrix,SecondConstraintMatrix,ThirdConstraintMatrix,FourthConstraintMatrix,FifthConstraintMatrix,SixthConstraintMatrix,SeventhConstraintMatrix,EighthConstraintMatrix,NinthConstraintMatrix,TenthConstraintMatrix,EleventhConstraintMatrix,TwelfthConstraintMatrix)
+> Inequalities = rbind(FirstInequalities,SecondInequalities,ThirdInequalities,FourthInequalities,FifthInequalities,SixthInequalities,SeventhInequalities,EighthInequalities,NinthInequalities,TenthInequalities,EleventhInequalities,TwelfthInequalities)
+> RightHandSide = rbind(FirstRightHandSide,SecondRightHandSide,ThirdRightHandSide,FourthRightHandSide,FifthRightHandSide,SixthRightHandSide,SeventhRightHandSide,EighthRightHandSide,NinthRightHandSide,TenthRightHandSide,EleventhRightHandSide,TwelfthRightHandSide)
+> 
+> 
+> ###########################
+> # Let's build our LP now!!!
+> ###########################
+> 
+> #load the appropriate libraries:
+> library(lpSolveAPI)
+> library(lpSolve)
+Warning message:
+package 'lpSolve' was built under R version 3.2.3 
+> 
+> #Initialize the LP
+> MyFinalTestLP = make.lp(NROW(ConstraintMatrix),NCOL(ConstraintMatrix))
+> set.type(MyFinalTestLP,seq(1,NCOL(ConstraintMatrix)-1),type=c("binary")) #this is sort of optional, but if you wanted these variables to be constrained to be either 0 or 1, with no halfsies, this is the way to do it.
+> 
+> #set objective
+> set.objfn(MyFinalTestLP,objectiveFunction)
+> #set control for a maximization problem
+> lp.control(MyFinalTestLP,sense='max')
+$anti.degen
+[1] "fixedvars" "stalling" 
+
+$basis.crash
+[1] "none"
+
+$bb.depthlimit
+[1] -50
+
+$bb.floorfirst
+[1] "automatic"
+
+$bb.rule
+[1] "pseudononint" "greedy"       "dynamic"      "rcostfixing" 
+
+$break.at.first
+[1] FALSE
+
+$break.at.value
+[1] 1e+30
+
+$epsilon
+      epsb       epsd      epsel     epsint epsperturb   epspivot 
+     1e-10      1e-09      1e-12      1e-07      1e-05      2e-07 
+
+$improve
+[1] "dualfeas" "thetagap"
+
+$infinite
+[1] 1e+30
+
+$maxpivot
+[1] 250
+
+$mip.gap
+absolute relative 
+   1e-11    1e-11 
+
+$negrange
+[1] -1e+06
+
+$obj.in.basis
+[1] TRUE
+
+$pivoting
+[1] "devex"    "adaptive"
+
+$presolve
+[1] "none"
+
+$scalelimit
+[1] 5
+
+$scaling
+[1] "geometric"   "equilibrate" "integers"   
+
+$sense
+[1] "maximize"
+
+$simplextype
+NULL
+
+$timeout
+[1] 0
+
+$verbose
+[1] "neutral"
+
+> 
+> #write constraints:
+> for(rowCounter in 1:NROW(ConstraintMatrix)){
++   set.row(MyFinalTestLP,rowCounter,ConstraintMatrix[rowCounter,])
++   set.constr.type(MyFinalTestLP,Inequalities[rowCounter],rowCounter)
++   set.rhs(MyFinalTestLP, RightHandSide[rowCounter], rowCounter)
++ }
+> 
+> write.lp(MyFinalTestLP,'MyFinalTestLP.mps',type='mps')
+> 
+> #################################
+> # Solving using COIN-OR-CBC in R:
+> #################################
+> 
+> system("/Users/Erik_2/CoinOR/bin/cbc.exe", input='import MyFinalTestLP.mps solve solution myFinalTestSolution.txt', wait=TRUE)
+Welcome to the CBC MILP Solver 
+Version: 2.7.5 
+Build Date: Nov 10 2011 
+Revision Number: 1759 
+
+CoinSolver takes input from arguments ( - switches to stdin)
+Enter ? for list of commands or help
+Coin:At line 8 NAME
+At line 9 ROWS
+At line 3531 COLUMNS
+At line 18471 RHS
+At line 19290 BOUNDS
+At line 22186 ENDATA
+Problem no_name has 3520 rows, 2896 columns and 26813 elements
+Coin0008I no_name read with 0 errors
+Continuous objective value is -607.167 - 0.17 seconds
+Cgl0003I 6 fixed, 0 tightened bounds, 639 strengthened rows, 420 substitutions
+Cgl0003I 0 fixed, 0 tightened bounds, 101 strengthened rows, 280 substitutions
+Cgl0003I 25 fixed, 0 tightened bounds, 0 strengthened rows, 0 substitutions
+Cgl0003I 25 fixed, 0 tightened bounds, 2 strengthened rows, 0 substitutions
+Cgl0003I 2 fixed, 0 tightened bounds, 0 strengthened rows, 0 substitutions
+Cgl0003I 2 fixed, 0 tightened bounds, 0 strengthened rows, 0 substitutions
+Cgl0004I processed model has 3160 rows, 2720 columns (2719 integer) and 22699 elements
+Cbc0038I Pass   1: (0.92 seconds) suminf.   18.17778 (139) obj. 15833.1 iterations 952
+Cbc0038I Pass   2: (0.94 seconds) suminf.   16.43938 (132) obj. 19459.5 iterations 58
+Cbc0038I Pass   3: (0.94 seconds) suminf.   12.13473 (112) obj. 19459.5 iterations 39
+Cbc0038I Pass   4: (0.95 seconds) suminf.    9.82038 (101) obj. 19459.5 iterations 19
+Cbc0038I Pass   5: (0.95 seconds) suminf.    7.53109 (73) obj. 19459.5 iterations 44
+Cbc0038I Pass   6: (0.97 seconds) suminf.    5.02692 (48) obj. 19459.5 iterations 36
+Cbc0038I Pass   7: (0.97 seconds) suminf.    4.62692 (47) obj. 19459.5 iterations 1
+Cbc0038I Pass   8: (0.99 seconds) suminf.    2.57995 (33) obj. 19459.5 iterations 24
+Cbc0038I Pass   9: (0.99 seconds) suminf.    1.70000 (21) obj. 19459.5 iterations 25
+Cbc0038I Pass  10: (1.00 seconds) suminf.    1.53333 (20) obj. 19459.5 iterations 1
+Cbc0038I Pass  11: (1.00 seconds) suminf.    0.48718 (4) obj. 19459.5 iterations 41
+Cbc0038I Solution found of 19459.5
+Cbc0038I Before mini branch and bound, 2373 integers at bound fixed and 0 continuous
+Cbc0038I Full problem 3160 rows 2720 columns, reduced to 397 rows 243 columns
+Cbc0038I Mini branch and bound improved solution from 19459.5 to -540.5 (1.05 seconds)
+Cbc0038I Round again with cutoff of -547.167
+Cbc0038I Reduced cost fixing fixed 1168 variables on major pass 2
+Cbc0038I Pass  12: (1.08 seconds) suminf.   17.79212 (142) obj. -547.167 iterations 210
+Cbc0038I Pass  13: (1.11 seconds) suminf.   16.10786 (132) obj. -547.167 iterations 206
+Cbc0038I Pass  14: (1.13 seconds) suminf.   11.84321 (113) obj. -547.167 iterations 36
+Cbc0038I Pass  15: (1.13 seconds) suminf.    9.33742 (95) obj. -547.167 iterations 40
+Cbc0038I Pass  16: (1.14 seconds) suminf.    7.06775 (73) obj. -547.167 iterations 43
+Cbc0038I Pass  17: (1.14 seconds) suminf.    6.66775 (72) obj. -547.167 iterations 4
+Cbc0038I Pass  18: (1.14 seconds) suminf.    4.58858 (47) obj. -547.167 iterations 56
+Cbc0038I Pass  19: (1.16 seconds) suminf.    2.73706 (31) obj. -547.167 iterations 44
+Cbc0038I Pass  20: (1.16 seconds) suminf.    2.26737 (30) obj. -547.167 iterations 1
+Cbc0038I Pass  21: (1.17 seconds) suminf.    0.92051 (15) obj. -547.167 iterations 39
+Cbc0038I Pass  22: (1.17 seconds) suminf.    0.78383 (7) obj. -547.167 iterations 31
+Cbc0038I Pass  23: (1.19 seconds) suminf.    0.78383 (7) obj. -547.167 iterations 4
+Cbc0038I Pass  24: (1.20 seconds) suminf.    0.26667 (4) obj. -547.167 iterations 125
+Cbc0038I Pass  25: (1.20 seconds) suminf.    0.26667 (4) obj. -547.167 iterations 58
+Cbc0038I Pass  26: (1.22 seconds) suminf.    0.26667 (4) obj. -547.167 iterations 11
+Cbc0038I Pass  27: (1.24 seconds) suminf.    6.30714 (37) obj. -547.167 iterations 240
+Cbc0038I Pass  28: (1.25 seconds) suminf.    4.84625 (36) obj. -547.167 iterations 166
+Cbc0038I Pass  29: (1.27 seconds) suminf.    2.12006 (19) obj. -547.167 iterations 47
+Cbc0038I Pass  30: (1.27 seconds) suminf.    0.48051 (6) obj. -547.167 iterations 23
+Cbc0038I Pass  31: (1.28 seconds) suminf.    0.32667 (4) obj. -547.167 iterations 19
+Cbc0038I Pass  32: (1.28 seconds) suminf.    0.32667 (4) obj. -547.167 iterations 1
+Cbc0038I Pass  33: (1.30 seconds) suminf.    2.98682 (20) obj. -547.167 iterations 219
+Cbc0038I Pass  34: (1.31 seconds) suminf.    2.52253 (19) obj. -547.167 iterations 170
+Cbc0038I Pass  35: (1.33 seconds) suminf.    1.10424 (8) obj. -547.167 iterations 34
+Cbc0038I Pass  36: (1.33 seconds) suminf.    0.34667 (4) obj. -547.167 iterations 14
+Cbc0038I Pass  37: (1.35 seconds) suminf.    0.34667 (4) obj. -547.167 iterations 1
+Cbc0038I Pass  38: (1.36 seconds) suminf.    3.05466 (25) obj. -547.167 iterations 187
+Cbc0038I Pass  39: (1.38 seconds) suminf.    2.71783 (25) obj. -547.167 iterations 148
+Cbc0038I Pass  40: (1.39 seconds) suminf.    0.32667 (4) obj. -547.167 iterations 80
+Cbc0038I Pass  41: (1.39 seconds) suminf.    0.32667 (4) obj. -547.167 iterations 1
+Cbc0038I No solution found this major pass
+Cbc0038I Before mini branch and bound, 2334 integers at bound fixed and 0 continuous
+Cbc0038I Full problem 3160 rows 2720 columns, reduced to 470 rows 284 columns
+Cbc0038I Mini branch and bound did not improve solution (1.44 seconds)
+Cbc0038I After 1.44 seconds - Feasibility pump exiting with objective of -540.5 - took 0.61 seconds
+Cbc0012I Integer solution of -540.5 found by feasibility pump after 0 iterations and 0 nodes (1.45 seconds)
+Cbc0038I Full problem 3160 rows 2720 columns, reduced to 395 rows 240 columns
+Cbc0038I Full problem 3160 rows 2720 columns, reduced to 89 rows 59 columns
+Cbc0031I 208 added rows had average density of 5.0144231
+Cbc0013I At root node, 208 cuts changed objective from -607.16667 to -540.50751 in 15 passes
+Cbc0014I Cut generator 0 (Probing) - 1524 row cuts average 2.5 elements, 22 column cuts (230 active)  in 0.187 seconds - new frequency is 1
+Cbc0014I Cut generator 1 (Gomory) - 383 row cuts average 39.8 elements, 0 column cuts (0 active)  in 0.047 seconds - new frequency is 1
+Cbc0014I Cut generator 2 (Knapsack) - 133 row cuts average 2.1 elements, 0 column cuts (0 active)  in 0.030 seconds - new frequency is 1
+Cbc0014I Cut generator 3 (Clique) - 0 row cuts average 0.0 elements, 0 column cuts (0 active)  in 0.015 seconds - new frequency is -100
+Cbc0014I Cut generator 4 (MixedIntegerRounding2) - 159 row cuts average 8.4 elements, 0 column cuts (0 active)  in 0.032 seconds - new frequency is 1
+Cbc0014I Cut generator 5 (FlowCover) - 0 row cuts average 0.0 elements, 0 column cuts (0 active)  in 0.000 seconds - new frequency is -100
+Cbc0014I Cut generator 6 (TwoMirCuts) - 299 row cuts average 19.0 elements, 0 column cuts (0 active)  in 0.063 seconds - new frequency is -100
+Cbc0001I Search completed - best objective -540.4999999999999, took 1364 iterations and 0 nodes (2.34 seconds)
+Cbc0032I Strong branching done 4 times (12 iterations), fathomed 1 nodes and fixed 0 variables
+Cbc0035I Maximum depth 0, 1172 variables fixed on reduced cost
+Cuts at root node changed objective from -607.167 to -540.5
+Probing was tried 15 times and created 1546 cuts of which 208 were active after adding rounds of cuts (0.187 seconds)
+Gomory was tried 15 times and created 383 cuts of which 0 were active after adding rounds of cuts (0.047 seconds)
+Knapsack was tried 15 times and created 133 cuts of which 0 were active after adding rounds of cuts (0.030 seconds)
+Clique was tried 15 times and created 0 cuts of which 0 were active after adding rounds of cuts (0.015 seconds)
+MixedIntegerRounding2 was tried 15 times and created 159 cuts of which 0 were active after adding rounds of cuts (0.032 seconds)
+FlowCover was tried 15 times and created 0 cuts of which 0 were active after adding rounds of cuts (0.000 seconds)
+TwoMirCuts was tried 15 times and created 299 cuts of which 0 were active after adding rounds of cuts (0.063 seconds)
+
+Result - Optimal solution found
+
+Objective value:                -540.50000000
+Enumerated nodes:               0
+Total iterations:               1364
+Time (CPU seconds):             2.41
+Time (Wallclock seconds):       2.41
+
+Coin:Total time (CPU seconds):       2.42   (Wallclock seconds):       2.42
+
+> 
+> results = data.frame(read.table("myFinalTestSolution.txt", skip=1, header=FALSE)) #Line one is the objective value - skip it
+> results$V3 = NULL #all ones in our case, so we drop it
+> results$V1 = results$V1 + 1 #This helped us match the index to the variable number (e.g. 20 | C21 becomes 21 | C21)
+> colnames(results) = c('var_num', 'var', 'var_val')
+> optimalObjectiveValue = sum(results$var_val) #hey, our objective value is back
+> 
+> whereItsAt = namesOfVariables[results$var_num] #Take that helpful index, go back to the list of names you fed COINOR, and pull the names by the index
+> 
+> position = pmatch("Attribute1.Monday.1",whereItsAt)# Find the position of the first Non-Student entry
+> whereItsAt = whereItsAt[1:position - 1]# Remove all Non-Student entries
+> 
+> write.csv(whereItsAt, file = "Temp.csv")# Write the vector answer to a .csv file
+> 
+> shell.exec("Temp.csv")# Open the file in Excel
+> 
+> shell.exec("Answer.xlsx")# Open the answer file in Excel
+> 
+> proc.time()-start
+   user  system elapsed 
+ 154.84   11.87  170.79 
+> 
+> proc.time()
+   user  system elapsed 
+ 155.10   11.87  171.07 
